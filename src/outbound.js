@@ -84,7 +84,7 @@ async function handleSlackEvent(req, res) {
   if (!event.thread_ts) return; // Not a thread reply, skip
 
   // Look up which WhatsApp number this thread belongs to
-  const conversation = db.findByThread(event.channel, event.thread_ts);
+  const conversation = await db.findByThread(event.channel, event.thread_ts);
   if (!conversation) {
     console.log(`No conversation found for thread ${event.thread_ts}, skipping`);
     return;
@@ -131,7 +131,7 @@ async function handleSlackEvent(req, res) {
       });
     }
 
-    db.touch(phoneNumber);
+    await db.touch(phoneNumber);
     console.log(`Successfully sent message to ${phoneNumber}`);
   } catch (err) {
     console.error(`Failed to send WhatsApp message to ${phoneNumber}:`, err.message);

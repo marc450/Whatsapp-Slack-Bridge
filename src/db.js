@@ -1,63 +1,61 @@
-const fs = require("fs");
-const path = require("path");
+const { createClient } = require("@supabase/supabase-js");
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "..", "data", "conversations.json");
+let supabase;
 
-let data = null;
-
-function load() {
-  if (data) return data;
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  if (fs.existsSync(DB_PATH)) {
-    data = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
-  } else {
-    data = { conversations: {} };
+function getClient() {
+  if (!supabase) {
+    supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
   }
-  return data;
-}
-
-function save() {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  return supabase;
 }
 
 // Find a conversation by phone number
-function findByPhone(phoneNumber) {
-  const d = load();
-  return d.conversations[phoneNumber] || null;
+async function findByPhone(phoneNumber) {
+  const { data, error } = await getClient()
+    .from("conversations")
+    .select("*")
+    .eq("phone_number", phoneNumber)
+    .single();
+  if (error && error.code !== "PGRST116") throw error; // PGRST116 = not found
+  return data || null;
 }
 
 // Find a conversation by Slack thread
-function findByThread(channel, threadTs) {
-  const d = load();
-  for (const [phone, conv] of Object.entries(d.conversations)) {
-    if (conv.slack_channel === channel && conv.slack_thread_ts === threadTs) {
-      return { phone_number: phone, ...conv };
-    }
-  }
-  return null;
+async function findByThread(channel, threadTs) {
+  const { data, error } = await getClient()
+    .from("conversations")
+    .select("*")
+    .eq("slack_channel", channel)
+    .eq("slack_thread_ts", threadTs)
+    .single();
+  if (error && error.code !== "PGRST116") throw error;
+  return data || null;
 }
 
 // Create or update a conversation
-function upsert(phoneNumber, slackChannel, slackThreadTs, displayName) {
-  const d = load();
-  const existing = d.conversations[phoneNumber];
-  d.conversations[phoneNumber] = {
-    slack_thread_ts: slackThreadTs,
-    slack_channel: slackChannel,
-    display_name: displayName || (existing && existing.display_name) || null,
-    first_contact_at: (existing && existing.first_contact_at) || new Date().toISOString(),
-    last_message_at: new Date().toISOString(),
-  };
-  save();
+async function upsert(phoneNumber, slackChannel, slackThreadTs, displayName) {
+  const { error } = await getClient()
+    .from("conversations")
+    .upsert({
+      phone_number: phoneNumber,
+      slack_channel: slackChannel,
+      slack_thread_ts: slackThreadTs,
+      display_name: displayName,
+      last_message_at: new Date().toISOString(),
+    }, { onConflict: "phone_number" });
+  if (error) throw error;
 }
 
 // Update last_message_at timestamp
-function touch(phoneNumber) {
-  const d = load();
-  if (d.conversations[phoneNumber]) {
-    d.conversations[phoneNumber].last_message_at = new Date().toISOString();
-    save();
-  }
+async function touch(phoneNumber) {
+  const { error } = await getClient()
+    .from("conversations")
+    .update({ last_message_at: new Date().toISOString() })
+    .eq("phone_number", phoneNumber);
+  if (error) throw error;
 }
 
 module.exports = { findByPhone, findByThread, upsert, touch };

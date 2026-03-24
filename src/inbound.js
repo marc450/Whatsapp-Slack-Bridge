@@ -134,7 +134,7 @@ async function handleInbound(req, res) {
   console.log(`Inbound WhatsApp from ${from}: "${messageBody}" (${numMedia} media)`);
 
   // Look up existing conversation
-  const existing = db.findByPhone(from);
+  const existing = await db.findByPhone(from);
   const isNewConversation = !existing;
 
   let threadTs;
@@ -148,7 +148,7 @@ async function handleInbound(req, res) {
       unfurl_links: false,
     });
     threadTs = existing.slack_thread_ts;
-    db.touch(from);
+    await db.touch(from);
   } else {
     // Start a new thread in Slack
     const displayName = profileName || formatPhone(from);
@@ -172,7 +172,7 @@ async function handleInbound(req, res) {
     }
 
     // Save the conversation mapping
-    db.upsert(from, SLACK_CHANNEL, threadTs, displayName);
+    await db.upsert(from, SLACK_CHANNEL, threadTs, displayName);
   }
 
   // Handle media attachments
