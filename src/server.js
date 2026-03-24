@@ -35,4 +35,7 @@ app.listen(PORT, () => {
   console.log(`  Slack events:    POST /webhook/slack`);
   console.log(`  Media proxy:     GET  /media/slack/:fileId`);
   console.log(`  Health check:    GET  /health`);
+  // Debug: log which env vars are set
+  const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SLACK_BOT_TOKEN", "SLACK_CHANNEL_ID", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_NUMBER", "BASE_URL"];
+  required.forEach(k => console.log(`  ${k}: ${process.env[k] ? "set" : "MISSING"}`));
 });
