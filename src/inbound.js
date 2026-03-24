@@ -119,6 +119,7 @@ async function uploadMediaToSlack(mediaUrl, mediaContentType, threadTs) {
 
 // Main handler for incoming WhatsApp messages
 async function handleInbound(req, res) {
+  try {
   // Validate Twilio signature
   if (!validateTwilioRequest(req)) {
     console.warn("Invalid Twilio signature, rejecting request");
@@ -210,6 +211,10 @@ async function handleInbound(req, res) {
 
   // Respond to Twilio (empty TwiML - no immediate reply)
   res.type("text/xml").send("<Response></Response>");
+  } catch (err) {
+    console.error("Unhandled error in handleInbound:", err);
+    res.status(500).type("text/xml").send("<Response></Response>");
+  }
 }
 
 module.exports = { handleInbound };

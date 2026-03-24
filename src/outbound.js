@@ -50,6 +50,7 @@ async function getSlackFileUrl(fileInfo) {
 
 // Main handler for Slack Events API
 async function handleSlackEvent(req, res) {
+  try {
   const body = req.body;
 
   // Handle Slack URL verification challenge
@@ -142,6 +143,9 @@ async function handleSlackEvent(req, res) {
       thread_ts: event.thread_ts,
       text: `:x: Failed to deliver message to WhatsApp: ${err.message}`,
     });
+  }
+  } catch (err) {
+    console.error("Unhandled error in handleSlackEvent:", err);
   }
 }
 
