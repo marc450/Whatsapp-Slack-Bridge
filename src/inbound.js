@@ -7,8 +7,46 @@ const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 const SLACK_CHANNEL = process.env.SLACK_CHANNEL_ID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const AUTO_REPLY_MESSAGE = process.env.AUTO_REPLY_MESSAGE || null;
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER; // e.g. "whatsapp:+14405863762"
+
+// Business hours: Mon-Fri 08:00-18:00 Europe/Zurich
+const BUSINESS_START = 8;
+const BUSINESS_END = 18;
+
+function getEstimatedResponseMessage() {
+  const now = new Date();
+  // Get current time in Zurich
+  const zurich = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Zurich" }));
+  const day = zurich.getDay(); // 0=Sun, 6=Sat
+  const hour = zurich.getHours();
+  const minutes = zurich.getMinutes();
+  const isWeekday = day >= 1 && day <= 5;
+  const isBusinessHours = hour >= BUSINESS_START && hour < BUSINESS_END;
+
+  if (isWeekday && isBusinessHours) {
+    return "Thank you for reaching out to FALU support! Our team has been notified and will respond within 30 minutes.";
+  }
+
+  // Calculate next business day start
+  const next = new Date(zurich);
+  next.setHours(BUSINESS_START, 0, 0, 0);
+
+  // If it's after business hours today (weekday), move to next day
+  if (isWeekday && hour >= BUSINESS_END) {
+    next.setDate(next.getDate() + 1);
+  }
+
+  // Skip to Monday if it lands on Saturday (6) or Sunday (0)
+  const nextDay = next.getDay();
+  if (nextDay === 6) next.setDate(next.getDate() + 2);
+  else if (nextDay === 0) next.setDate(next.getDate() + 1);
+
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const nextDayName = dayNames[next.getDay()];
+  const nextHour = String(BUSINESS_START).padStart(2, "0") + ":00";
+
+  return `Thank you for reaching out to FALU support! Our team is currently outside business hours (Mon–Fri, 08:00–18:00 CET). We will respond on ${nextDayName} at ${nextHour} CET.`;
+}
 
 // Validate that the request really comes from Twilio
 function validateTwilioRequest(req) {
@@ -156,13 +194,13 @@ async function handleInbound(req, res) {
   }
 
   // Send auto-reply to first-time senders
-  if (isNewConversation && AUTO_REPLY_MESSAGE) {
+  if (isNewConversation) {
     try {
       const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
       await twilioClient.messages.create({
         from: TWILIO_WHATSAPP_NUMBER,
         to: `whatsapp:${from}`,
-        body: AUTO_REPLY_MESSAGE,
+        body: getEstimatedResponseMessage(),
       });
       console.log(`Sent auto-reply to ${from}`);
     } catch (err) {
