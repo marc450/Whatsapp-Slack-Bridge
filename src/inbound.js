@@ -51,8 +51,13 @@ function getEstimatedResponseMessage() {
 // Validate that the request really comes from Twilio
 function validateTwilioRequest(req) {
   if (process.env.SKIP_TWILIO_VALIDATION === "true") return true;
+  const baseUrl = process.env.BASE_URL;
+  if (!baseUrl) {
+    console.warn("BASE_URL not set, skipping Twilio validation");
+    return true;
+  }
   const signature = req.headers["x-twilio-signature"] || "";
-  const url = process.env.BASE_URL + "/webhook/twilio";
+  const url = baseUrl + "/webhook/twilio";
   return twilio.validateRequest(TWILIO_AUTH_TOKEN, signature, url, req.body);
 }
 
