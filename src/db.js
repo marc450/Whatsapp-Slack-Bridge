@@ -60,11 +60,13 @@ async function upsert(phoneNumber, slackChannel, slackThreadTs, displayName, det
   console.log(`DB upsert ok for ${phoneNumber} -> thread ${slackThreadTs}`);
 }
 
-// Update last_message_at timestamp
-async function touch(phoneNumber) {
+// Update last_message_at timestamp (and optionally detected_language)
+async function touch(phoneNumber, detectedLanguage = null) {
+  const update = { last_message_at: new Date().toISOString() };
+  if (detectedLanguage) update.detected_language = detectedLanguage;
   const { error } = await getClient()
     .from("conversations")
-    .update({ last_message_at: new Date().toISOString() })
+    .update(update)
     .eq("phone_number", phoneNumber);
   if (error) throw error;
 }

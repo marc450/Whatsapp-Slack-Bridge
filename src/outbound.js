@@ -13,6 +13,50 @@ const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
 const SLACK_BOT_USER_ID = process.env.SLACK_BOT_USER_ID;
 
+// Convert common Slack emoji codes to Unicode
+const SLACK_EMOJI_MAP = {
+  ":slightly_smiling_face:": "🙂",
+  ":smile:": "😄",
+  ":grinning:": "😀",
+  ":laughing:": "😆",
+  ":sweat_smile:": "😅",
+  ":joy:": "😂",
+  ":wink:": "😉",
+  ":blush:": "😊",
+  ":heart_eyes:": "😍",
+  ":sunglasses:": "😎",
+  ":thumbsup:": "👍",
+  ":thumbsdown:": "👎",
+  ":ok_hand:": "👌",
+  ":pray:": "🙏",
+  ":clap:": "👏",
+  ":wave:": "👋",
+  ":point_right:": "👉",
+  ":white_check_mark:": "✅",
+  ":x:": "❌",
+  ":warning:": "⚠️",
+  ":question:": "❓",
+  ":exclamation:": "❗",
+  ":fire:": "🔥",
+  ":wrench:": "🔧",
+  ":hammer:": "🔨",
+  ":construction:": "🚧",
+  ":checkered_flag:": "🏁",
+  ":phone:": "📞",
+  ":email:": "📧",
+  ":calendar:": "📅",
+  ":clock1:": "🕐",
+  ":thinking_face:": "🤔",
+  ":disappointed:": "😞",
+  ":worried:": "😟",
+  ":cry:": "😢",
+  ":angry:": "😠",
+};
+
+function convertSlackEmojis(text) {
+  return text.replace(/:[a-z0-9_]+:/g, (match) => SLACK_EMOJI_MAP[match] || match);
+}
+
 // Validate Slack request signature
 function validateSlackRequest(req) {
   if (process.env.SKIP_SLACK_VALIDATION === "true") return true;
@@ -99,7 +143,7 @@ async function handleSlackEvent(req, res) {
   console.log(`Outbound to ${phoneNumber}: "${event.text || "(media)"}" (lang: ${targetLang || "EN"})`);
 
   // Translate outbound text to mechanic's language if known and not English
-  let outboundText = event.text || "";
+  let outboundText = convertSlackEmojis(event.text || "");
   if (outboundText && targetLang && targetLang !== "EN") {
     try {
       const result = await translate(outboundText, targetLang, "EN");

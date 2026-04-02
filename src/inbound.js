@@ -170,7 +170,7 @@ async function handleInbound(req, res) {
       unfurl_links: false,
     });
     threadTs = existing.slack_thread_ts;
-    await db.touch(from);
+    await db.touch(from, detectedLanguage);
   } else {
     // Start a new thread in Slack
     const displayName = profileName || formatPhone(from);
