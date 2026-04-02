@@ -19,7 +19,11 @@ async function findByPhone(phoneNumber) {
     .select("*")
     .eq("phone_number", phoneNumber)
     .single();
-  if (error && error.code !== "PGRST116") throw error; // PGRST116 = not found
+  if (error && error.code !== "PGRST116") {
+    console.error("DB findByPhone error:", JSON.stringify(error));
+    throw error;
+  }
+  console.log(`DB findByPhone ${phoneNumber}: ${data ? "found" : "not found"}`);
   return data || null;
 }
 
@@ -37,6 +41,7 @@ async function findByThread(channel, threadTs) {
 
 // Create or update a conversation
 async function upsert(phoneNumber, slackChannel, slackThreadTs, displayName) {
+  const now = new Date().toISOString();
   const { error } = await getClient()
     .from("conversations")
     .upsert({
@@ -44,9 +49,15 @@ async function upsert(phoneNumber, slackChannel, slackThreadTs, displayName) {
       slack_channel: slackChannel,
       slack_thread_ts: slackThreadTs,
       display_name: displayName,
-      last_message_at: new Date().toISOString(),
+      last_message_at: now,
+      first_contact_at: now,
+      created_at: now,
     }, { onConflict: "phone_number" });
-  if (error) throw error;
+  if (error) {
+    console.error("DB upsert error:", JSON.stringify(error));
+    throw error;
+  }
+  console.log(`DB upsert ok for ${phoneNumber} -> thread ${slackThreadTs}`);
 }
 
 // Update last_message_at timestamp
