@@ -144,7 +144,14 @@ async function handleSlackEvent(req, res) {
   let agentName = null;
   try {
     const userInfo = await slack.users.info({ user: event.user });
-    agentName = userInfo.user?.profile?.display_name || userInfo.user?.real_name || null;
+    const profile = userInfo.user?.profile;
+    agentName =
+      profile?.display_name ||
+      profile?.real_name ||
+      userInfo.user?.real_name ||
+      userInfo.user?.name ||
+      null;
+    console.log(`Slack user lookup for ${event.user}: display_name="${profile?.display_name}" real_name="${profile?.real_name}" name="${userInfo.user?.name}" -> using "${agentName}"`);
   } catch (err) {
     console.error("Failed to fetch Slack user info:", err.message);
   }
