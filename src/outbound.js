@@ -140,7 +140,16 @@ async function handleSlackEvent(req, res) {
   const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
   const targetLang = conversation.detected_language;
 
-  console.log(`Outbound to ${phoneNumber}: "${event.text || "(media)"}" (lang: ${targetLang || "EN"})`);
+  // Look up the Slack user's display name
+  let agentName = null;
+  try {
+    const userInfo = await slack.users.info({ user: event.user });
+    agentName = userInfo.user?.profile?.display_name || userInfo.user?.real_name || null;
+  } catch (err) {
+    console.error("Failed to fetch Slack user info:", err.message);
+  }
+
+  console.log(`Outbound to ${phoneNumber}: "${event.text || "(media)"}" (lang: ${targetLang || "EN"}, agent: ${agentName})`);
 
   // Translate outbound text to mechanic's language if known and not English
   let outboundText = convertSlackEmojis(event.text || "");
@@ -152,6 +161,11 @@ async function handleSlackEvent(req, res) {
       console.error("Translation error (outbound):", err.message);
       // Fall back to original English text
     }
+  }
+
+  // Prepend agent name so mechanic knows who they're speaking to
+  if (agentName && outboundText) {
+    outboundText = `*${agentName}:* ${outboundText}`;
   }
 
   try {

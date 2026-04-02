@@ -219,10 +219,19 @@ async function handleInbound(req, res) {
   if (isNewConversation) {
     try {
       const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+      let autoReply = getEstimatedResponseMessage();
+      if (detectedLanguage && detectedLanguage !== "EN") {
+        try {
+          const translated = await translate(autoReply, detectedLanguage, "EN");
+          autoReply = translated.text;
+        } catch (err) {
+          console.error("Auto-reply translation error:", err.message);
+        }
+      }
       await twilioClient.messages.create({
         from: TWILIO_WHATSAPP_NUMBER,
         to: `whatsapp:${from}`,
-        body: getEstimatedResponseMessage(),
+        body: autoReply,
       });
       console.log(`Sent auto-reply to ${from}`);
     } catch (err) {
