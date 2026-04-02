@@ -51,7 +51,6 @@ async function upsert(phoneNumber, slackChannel, slackThreadTs, displayName) {
       display_name: displayName,
       last_message_at: now,
       first_contact_at: now,
-      created_at: now,
     }, { onConflict: "phone_number" });
   if (error) {
     console.error("DB upsert error:", JSON.stringify(error));
