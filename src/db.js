@@ -40,7 +40,7 @@ async function findByThread(channel, threadTs) {
 }
 
 // Create or update a conversation
-async function upsert(phoneNumber, slackChannel, slackThreadTs, displayName) {
+async function upsert(phoneNumber, slackChannel, slackThreadTs, displayName, detectedLanguage = null) {
   const now = new Date().toISOString();
   const { error } = await getClient()
     .from("conversations")
@@ -51,6 +51,7 @@ async function upsert(phoneNumber, slackChannel, slackThreadTs, displayName) {
       display_name: displayName,
       last_message_at: now,
       first_contact_at: now,
+      detected_language: detectedLanguage,
     }, { onConflict: "phone_number" });
   if (error) {
     console.error("DB upsert error:", JSON.stringify(error));

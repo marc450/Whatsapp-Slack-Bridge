@@ -2,6 +2,7 @@
 const { WebClient } = require("@slack/web-api");
 const twilio = require("twilio");
 const db = require("./db");
+const { translate } = require("./translate");
 
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 const SLACK_CHANNEL = process.env.SLACK_CHANNEL_ID;
@@ -141,12 +142,31 @@ async function handleInbound(req, res) {
 
   let threadTs;
 
-  if (existing) {
+  // Translate inbound message to English if needed
+  let displayBody = messageBody;
+  let detectedLanguage = existing?.detected_language || null;
+  let translationNote = "";
+
+  if (messageBody) {
+    try {
+      const result = await translate(messageBody, "EN");
+      detectedLanguage = result.detectedLanguage;
+      // Only show translation if the message isn't already in English
+      if (detectedLanguage && detectedLanguage !== "EN") {
+        displayBody = result.text;
+        translationNote = `\n_🌐 Translated from ${detectedLanguage} · Original: "${messageBody}"_`;
+      }
+    } catch (err) {
+      console.error("Translation error:", err.message);
+    }
+  }
+
+  if (existing && !isExpired) {
     // Post as thread reply to existing conversation
-    const slackMsg = await slack.chat.postMessage({
+    await slack.chat.postMessage({
       channel: SLACK_CHANNEL,
       thread_ts: existing.slack_thread_ts,
-      text: messageBody || "(media message)",
+      text: (displayBody || "(media)") + translationNote,
       unfurl_links: false,
     });
     threadTs = existing.slack_thread_ts;
@@ -168,13 +188,13 @@ async function handleInbound(req, res) {
       await slack.chat.postMessage({
         channel: SLACK_CHANNEL,
         thread_ts: threadTs,
-        text: messageBody,
+        text: displayBody + translationNote,
         unfurl_links: false,
       });
     }
 
-    // Save the conversation mapping
-    await db.upsert(from, SLACK_CHANNEL, threadTs, displayName);
+    // Save the conversation mapping including detected language
+    await db.upsert(from, SLACK_CHANNEL, threadTs, displayName, detectedLanguage);
   }
 
   // Handle media attachments

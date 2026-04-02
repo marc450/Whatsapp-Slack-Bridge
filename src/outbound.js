@@ -3,6 +3,7 @@ const { WebClient } = require("@slack/web-api");
 const twilio = require("twilio");
 const crypto = require("crypto");
 const db = require("./db");
+const { translate } = require("./translate");
 
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 const SLACK_CHANNEL = process.env.SLACK_CHANNEL_ID;
@@ -93,8 +94,21 @@ async function handleSlackEvent(req, res) {
 
   const phoneNumber = conversation.phone_number;
   const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+  const targetLang = conversation.detected_language;
 
-  console.log(`Outbound to ${phoneNumber}: "${event.text || "(media)"}"`);
+  console.log(`Outbound to ${phoneNumber}: "${event.text || "(media)"}" (lang: ${targetLang || "EN"})`);
+
+  // Translate outbound text to mechanic's language if known and not English
+  let outboundText = event.text || "";
+  if (outboundText && targetLang && targetLang !== "EN") {
+    try {
+      const result = await translate(outboundText, targetLang, "EN");
+      outboundText = result.text;
+    } catch (err) {
+      console.error("Translation error (outbound):", err.message);
+      // Fall back to original English text
+    }
+  }
 
   try {
     // Check for file attachments
@@ -117,18 +131,17 @@ async function handleSlackEvent(req, res) {
           mediaUrl: [mediaUrls[i]],
         };
         // Attach text only to the first media message
-        if (i === 0 && event.text) {
-          msgParams.body = event.text;
+        if (i === 0 && outboundText) {
+          msgParams.body = outboundText;
         }
         await twilioClient.messages.create(msgParams);
       }
-      // If there are more media than text, and text wasn't sent with first media
-    } else if (event.text) {
+    } else if (outboundText) {
       // Text-only message
       await twilioClient.messages.create({
         from: TWILIO_WHATSAPP_NUMBER,
         to: `whatsapp:${phoneNumber}`,
-        body: event.text,
+        body: outboundText,
       });
     }
 
