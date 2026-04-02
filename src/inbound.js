@@ -174,7 +174,7 @@ async function handleInbound(req, res) {
   } else {
     // Start a new thread in Slack
     const displayName = profileName || formatPhone(from);
-    const headerText = `:iphone: *New WhatsApp message from ${displayName}*\nPhone: \`${from}\``;
+    const headerText = `:iphone: *Message from ${displayName}*`;
 
     const slackMsg = await slack.chat.postMessage({
       channel: SLACK_CHANNEL,
