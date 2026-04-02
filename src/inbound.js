@@ -154,7 +154,7 @@ async function handleInbound(req, res) {
       // Only show translation if the message isn't already in English
       if (detectedLanguage && detectedLanguage !== "EN") {
         displayBody = result.text;
-        translationNote = `\n_🌐 Translated from ${detectedLanguage} · Original: "${messageBody}"_`;
+        translationNote = `\n\n_🌐 ${detectedLanguage} original:_\n_"${messageBody}"_`;
       }
     } catch (err) {
       console.error("Translation error:", err.message);
