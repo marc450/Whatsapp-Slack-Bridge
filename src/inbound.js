@@ -39,7 +39,7 @@ function getEstimatedResponseMessage() {
 
   const hoursUntil = Math.round((next - zurich) / (1000 * 60 * 60));
 
-  return `✅ Your message reached FALU support. Our team is currently offline and will reply in about ${hoursUntil} hours.`;
+  return `✅ Your message reached FALU support. Our team is based in Switzerland and is currently offline. We will reply in about ${hoursUntil} hours.`;
 }
 
 // Validate that the request really comes from Twilio
