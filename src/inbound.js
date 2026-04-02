@@ -15,37 +15,31 @@ const BUSINESS_END = 18;
 
 function getEstimatedResponseMessage() {
   const now = new Date();
-  // Get current time in Zurich
   const zurich = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Zurich" }));
   const day = zurich.getDay(); // 0=Sun, 6=Sat
   const hour = zurich.getHours();
-  const minutes = zurich.getMinutes();
   const isWeekday = day >= 1 && day <= 5;
   const isBusinessHours = hour >= BUSINESS_START && hour < BUSINESS_END;
 
   if (isWeekday && isBusinessHours) {
-    return "Thank you for reaching out to FALU support! Our team has been notified and will respond within 30 minutes.";
+    return "✅ Your message reached FALU support. We'll get back to you within 30 minutes.";
   }
 
-  // Calculate next business day start
+  // Calculate hours until next business day start
   const next = new Date(zurich);
   next.setHours(BUSINESS_START, 0, 0, 0);
 
-  // If it's after business hours today (weekday), move to next day
   if (isWeekday && hour >= BUSINESS_END) {
     next.setDate(next.getDate() + 1);
   }
 
-  // Skip to Monday if it lands on Saturday (6) or Sunday (0)
   const nextDay = next.getDay();
   if (nextDay === 6) next.setDate(next.getDate() + 2);
   else if (nextDay === 0) next.setDate(next.getDate() + 1);
 
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const nextDayName = dayNames[next.getDay()];
-  const nextHour = String(BUSINESS_START).padStart(2, "0") + ":00";
+  const hoursUntil = Math.round((next - zurich) / (1000 * 60 * 60));
 
-  return `Thank you for reaching out to FALU support! Our team is currently outside business hours (Mon–Fri, 08:00–18:00 CET). We will respond on ${nextDayName} at ${nextHour} CET.`;
+  return `✅ Your message reached FALU support. Our team is currently offline and will reply in about ${hoursUntil} hours.`;
 }
 
 // Validate that the request really comes from Twilio
