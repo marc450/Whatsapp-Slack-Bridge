@@ -139,9 +139,11 @@ async function handleInbound(req, res) {
 
   console.log(`Inbound WhatsApp from ${from}: "${messageBody}" (${numMedia} media)`);
 
-  // Look up existing conversation
+  // Look up existing conversation (expire after 12 hours of inactivity)
   const existing = await db.findByPhone(from);
-  const isNewConversation = !existing;
+  const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+  const isExpired = existing && (Date.now() - new Date(existing.last_message_at).getTime() > TWELVE_HOURS_MS);
+  const isNewConversation = !existing || isExpired;
 
   let threadTs;
 
