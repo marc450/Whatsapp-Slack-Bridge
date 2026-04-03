@@ -16,29 +16,36 @@ const BUSINESS_START = 8;
 const BUSINESS_END = 18;
 const hd = new Holidays("CH", "ZH");
 
-function isZurichHoliday(date) {
-  return !!hd.isHoliday(date);
+function getHolidayName(date) {
+  const result = hd.isHoliday(date);
+  if (!result) return null;
+  const entry = Array.isArray(result) ? result[0] : result;
+  return entry.name || null;
 }
 
 function isBusinessDay(date) {
   const day = date.getDay();
-  return day >= 1 && day <= 5 && !isZurichHoliday(date);
+  return day >= 1 && day <= 5 && !getHolidayName(date);
 }
 
-// Advance date to the next actual business day (skip weekends + holidays)
+// Advance to next business day; returns { date, holidaysSkipped: string[] }
 function advanceToNextBusinessDay(date) {
   const d = new Date(date);
+  const holidaysSkipped = [];
   d.setDate(d.getDate() + 1);
   while (!isBusinessDay(d)) {
+    const name = getHolidayName(d);
+    if (name && !holidaysSkipped.includes(name)) holidaysSkipped.push(name);
     d.setDate(d.getDate() + 1);
   }
-  return d;
+  return { date: d, holidaysSkipped };
 }
 
 function getEstimatedResponseMessage() {
   const now = new Date();
   const zurich = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Zurich" }));
   const hour = zurich.getHours();
+  const todayHoliday = getHolidayName(zurich);
   const isOpenNow = isBusinessDay(zurich) && hour >= BUSINESS_START && hour < BUSINESS_END;
 
   if (isOpenNow) {
@@ -48,16 +55,25 @@ function getEstimatedResponseMessage() {
   // Find when we next open
   let next = new Date(zurich);
   next.setHours(BUSINESS_START, 0, 0, 0);
+  let holidaysInPath = todayHoliday ? [todayHoliday] : [];
 
   if (!isBusinessDay(zurich) || hour >= BUSINESS_END) {
-    // Already past end of day (or holiday/weekend) — move to next business day
-    next = advanceToNextBusinessDay(zurich);
+    const { date: nextDate, holidaysSkipped } = advanceToNextBusinessDay(zurich);
+    next = nextDate;
     next.setHours(BUSINESS_START, 0, 0, 0);
+    holidaysInPath = [...holidaysInPath, ...holidaysSkipped];
   }
 
   const hoursUntil = Math.round((next - zurich) / (1000 * 60 * 60));
 
-  return `✅ Your message reached FALU support. Our team is based in Switzerland and is currently offline. We will reply in about ${hoursUntil} hours.`;
+  let message = `✅ Your message reached FALU support. Our team is based in Switzerland and is currently offline. We will reply in about ${hoursUntil} hours.`;
+
+  if (holidaysInPath.length > 0) {
+    const names = holidaysInPath.join(", ");
+    message += ` (Please note: we are observing the following public holiday${holidaysInPath.length > 1 ? "s" : ""}: ${names}.)`;
+  }
+
+  return message;
 }
 
 // Validate that the request really comes from Twilio
