@@ -1,6 +1,7 @@
 // Inbound: WhatsApp message (via Twilio webhook) -> Slack
 const { WebClient } = require("@slack/web-api");
 const twilio = require("twilio");
+const Holidays = require("date-holidays");
 const db = require("./db");
 const { translate } = require("./translate");
 
@@ -10,33 +11,49 @@ const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER; // e.g. "whatsapp:+14405863762"
 
-// Business hours: Mon-Fri 08:00-18:00 Europe/Zurich
+// Business hours: Mon-Fri 08:00-18:00 Europe/Zurich, excluding ZH public holidays
 const BUSINESS_START = 8;
 const BUSINESS_END = 18;
+const hd = new Holidays("CH", "ZH");
+
+function isZurichHoliday(date) {
+  return !!hd.isHoliday(date);
+}
+
+function isBusinessDay(date) {
+  const day = date.getDay();
+  return day >= 1 && day <= 5 && !isZurichHoliday(date);
+}
+
+// Advance date to the next actual business day (skip weekends + holidays)
+function advanceToNextBusinessDay(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + 1);
+  while (!isBusinessDay(d)) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
 
 function getEstimatedResponseMessage() {
   const now = new Date();
   const zurich = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Zurich" }));
-  const day = zurich.getDay(); // 0=Sun, 6=Sat
   const hour = zurich.getHours();
-  const isWeekday = day >= 1 && day <= 5;
-  const isBusinessHours = hour >= BUSINESS_START && hour < BUSINESS_END;
+  const isOpenNow = isBusinessDay(zurich) && hour >= BUSINESS_START && hour < BUSINESS_END;
 
-  if (isWeekday && isBusinessHours) {
+  if (isOpenNow) {
     return "✅ Your message reached FALU support. We'll get back to you within 30 minutes.";
   }
 
-  // Calculate hours until next business day start
-  const next = new Date(zurich);
+  // Find when we next open
+  let next = new Date(zurich);
   next.setHours(BUSINESS_START, 0, 0, 0);
 
-  if (isWeekday && hour >= BUSINESS_END) {
-    next.setDate(next.getDate() + 1);
+  if (!isBusinessDay(zurich) || hour >= BUSINESS_END) {
+    // Already past end of day (or holiday/weekend) — move to next business day
+    next = advanceToNextBusinessDay(zurich);
+    next.setHours(BUSINESS_START, 0, 0, 0);
   }
-
-  const nextDay = next.getDay();
-  if (nextDay === 6) next.setDate(next.getDate() + 2);
-  else if (nextDay === 0) next.setDate(next.getDate() + 1);
 
   const hoursUntil = Math.round((next - zurich) / (1000 * 60 * 60));
 
