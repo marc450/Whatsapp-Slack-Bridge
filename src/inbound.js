@@ -230,6 +230,10 @@ async function handleInbound(req, res) {
     await db.upsert(from, SLACK_CHANNEL, threadTs, displayName, detectedLanguage);
   }
 
+  // Log the inbound message
+  const displayName = profileName || formatPhone(from);
+  await db.logMessage(from, displayName, "inbound", messageBody || null, detectedLanguage);
+
   // Handle media attachments
   for (let i = 0; i < numMedia; i++) {
     const mediaUrl = body[`MediaUrl${i}`];

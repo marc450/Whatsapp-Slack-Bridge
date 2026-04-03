@@ -211,6 +211,7 @@ async function handleSlackEvent(req, res) {
     }
 
     await db.touch(phoneNumber);
+    await db.logMessage(phoneNumber, conversation.display_name, "outbound", event.text || null, targetLang);
     console.log(`Successfully sent message to ${phoneNumber}`);
   } catch (err) {
     console.error(`Failed to send WhatsApp message to ${phoneNumber}:`, err.message);

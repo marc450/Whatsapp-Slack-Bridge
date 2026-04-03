@@ -71,4 +71,18 @@ async function touch(phoneNumber, detectedLanguage = null) {
   if (error) throw error;
 }
 
-module.exports = { findByPhone, findByThread, upsert, touch };
+// Log an individual message (inbound or outbound) for analytics
+async function logMessage(phoneNumber, displayName, direction, body, language = null) {
+  const { error } = await getClient()
+    .from("messages")
+    .insert({
+      phone_number: phoneNumber,
+      display_name: displayName,
+      direction,
+      body: body || null,
+      language: language || null,
+    });
+  if (error) console.error("DB logMessage error:", JSON.stringify(error));
+}
+
+module.exports = { findByPhone, findByThread, upsert, touch, logMessage };
