@@ -14,7 +14,7 @@ const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER; // e.g. "what
 // Business hours: Mon-Fri 08:00-18:00 Europe/Zurich, excluding ZH public holidays
 const BUSINESS_START = 8;
 const BUSINESS_END = 18;
-const hd = new Holidays("CH", "ZH");
+const hd = new Holidays("CH", "ZH", { languages: "en" });
 
 function getHolidayName(date) {
   const result = hd.isHoliday(date);
