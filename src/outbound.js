@@ -201,6 +201,7 @@ async function handleSlackEvent(req, res) {
     const mediaUrls = [];
 
     for (const file of files) {
+      console.log(`Slack file: id=${file.id} name=${file.name} mimetype=${file.mimetype} url_private=${file.url_private ? "yes" : "no"} url_private_download=${file.url_private_download ? "yes" : "no"}`);
       const publicUrl = await prepareSlackFileForTwilio(file);
       if (publicUrl) {
         mediaUrls.push(publicUrl);
@@ -219,6 +220,7 @@ async function handleSlackEvent(req, res) {
         if (i === 0 && outboundText) {
           msgParams.body = outboundText;
         }
+        console.log(`Sending media to Twilio: ${JSON.stringify(msgParams)}`);
         await twilioClient.messages.create(msgParams);
       }
     } else if (outboundText) {
@@ -234,7 +236,7 @@ async function handleSlackEvent(req, res) {
     await db.logMessage(phoneNumber, conversation.display_name, "outbound", event.text || null, targetLang);
     console.log(`Successfully sent message to ${phoneNumber}`);
   } catch (err) {
-    console.error(`Failed to send WhatsApp message to ${phoneNumber}:`, err.message);
+    console.error(`Failed to send WhatsApp message to ${phoneNumber}:`, err.message, err.code, err.status, err.moreInfo);
 
     // Notify in Slack thread that delivery failed
     await slack.chat.postMessage({
