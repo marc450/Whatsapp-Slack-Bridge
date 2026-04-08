@@ -2,6 +2,13 @@ const express = require("express");
 const { handleInbound } = require("./inbound");
 const { handleSlackEvent, handleMediaProxy } = require("./outbound");
 
+// Trim all env vars to avoid stray newlines/spaces breaking URLs etc.
+for (const key of Object.keys(process.env)) {
+  if (typeof process.env[key] === "string") {
+    process.env[key] = process.env[key].trim();
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
