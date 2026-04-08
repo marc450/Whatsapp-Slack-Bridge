@@ -78,19 +78,39 @@ function validateSlackRequest(req) {
   return crypto.timingSafeEqual(Buffer.from(mySignature), Buffer.from(signature));
 }
 
-// Download a Slack file and return a publicly accessible URL for Twilio
-// Twilio needs a public URL to send media, so we host it temporarily
-async function getSlackFileUrl(fileInfo) {
-  // Slack files need the bot token to access.
-  // For Twilio to fetch the media, we need a public URL.
-  // We proxy via our server so Twilio can fetch with proper content-type.
-  // Include filename in the URL so Twilio can determine the media type.
-  if (fileInfo.url_private_download) {
-    const baseUrl = process.env.BASE_URL;
+// In-memory cache for pre-downloaded Slack files (served to Twilio)
+// Entries auto-expire after 5 minutes
+const mediaCache = new Map();
+const MEDIA_CACHE_TTL = 5 * 60 * 1000;
+
+// Pre-download a Slack file and return a public URL that serves it from cache
+async function prepareSlackFileForTwilio(fileInfo) {
+  const downloadUrl = fileInfo.url_private_download || fileInfo.url_private;
+  if (!downloadUrl) return null;
+
+  try {
+    const response = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` },
+    });
+    if (!response.ok) {
+      console.error(`Failed to pre-download Slack file ${fileInfo.id}: ${response.status}`);
+      return null;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = fileInfo.mimetype || "application/octet-stream";
     const filename = fileInfo.name || `file.${fileInfo.filetype || "bin"}`;
+
+    // Store in cache
+    mediaCache.set(fileInfo.id, { buffer, contentType, filename });
+    setTimeout(() => mediaCache.delete(fileInfo.id), MEDIA_CACHE_TTL);
+
+    const baseUrl = process.env.BASE_URL;
     return `${baseUrl}/media/slack/${fileInfo.id}/${encodeURIComponent(filename)}`;
+  } catch (err) {
+    console.error(`Failed to pre-download Slack file ${fileInfo.id}:`, err.message);
+    return null;
   }
-  return null;
 }
 
 // Main handler for Slack Events API
@@ -181,7 +201,7 @@ async function handleSlackEvent(req, res) {
     const mediaUrls = [];
 
     for (const file of files) {
-      const publicUrl = await getSlackFileUrl(file);
+      const publicUrl = await prepareSlackFileForTwilio(file);
       if (publicUrl) {
         mediaUrls.push(publicUrl);
       }
@@ -228,39 +248,19 @@ async function handleSlackEvent(req, res) {
   }
 }
 
-// Proxy endpoint: serves Slack files to Twilio (which needs a public URL)
-async function handleMediaProxy(req, res) {
+// Proxy endpoint: serves pre-cached Slack files to Twilio
+function handleMediaProxy(req, res) {
   const fileId = req.params.fileId;
+  const cached = mediaCache.get(fileId);
 
-  try {
-    // Get file info from Slack
-    const fileInfo = await slack.files.info({ file: fileId });
-    const file = fileInfo.file;
-
-    if (!file || !file.url_private_download) {
-      return res.status(404).send("File not found");
-    }
-
-    // Download from Slack
-    const response = await fetch(file.url_private_download, {
-      headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` },
-    });
-
-    if (!response.ok) {
-      return res.status(502).send("Failed to fetch file from Slack");
-    }
-
-    // Stream to the requester (Twilio)
-    const contentType = file.mimetype || "application/octet-stream";
-    const filename = file.name || `file.${file.filetype || "bin"}`;
-    res.set("Content-Type", contentType);
-    res.set("Content-Disposition", `inline; filename="${filename}"`);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    res.send(buffer);
-  } catch (err) {
-    console.error(`Media proxy error for file ${fileId}:`, err.message);
-    res.status(500).send("Internal error");
+  if (!cached) {
+    console.error(`Media cache miss for file ${fileId} — file expired or was never cached`);
+    return res.status(404).send("File not found or expired");
   }
+
+  res.set("Content-Type", cached.contentType);
+  res.set("Content-Disposition", `inline; filename="${cached.filename}"`);
+  res.send(cached.buffer);
 }
 
 module.exports = { handleSlackEvent, handleMediaProxy };
