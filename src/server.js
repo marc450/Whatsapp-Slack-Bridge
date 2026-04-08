@@ -27,6 +27,9 @@ app.post("/webhook/twilio", handleInbound);
 app.post("/webhook/slack", handleSlackEvent);
 
 // Media proxy: serves Slack files to Twilio
+// Filename in URL helps Twilio determine media type
+app.get("/media/slack/:fileId/:filename", handleMediaProxy);
+// Keep old route as fallback
 app.get("/media/slack/:fileId", handleMediaProxy);
 
 app.listen(PORT, () => {

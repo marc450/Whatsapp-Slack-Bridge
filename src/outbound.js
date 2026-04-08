@@ -83,12 +83,12 @@ function validateSlackRequest(req) {
 async function getSlackFileUrl(fileInfo) {
   // Slack files need the bot token to access.
   // For Twilio to fetch the media, we need a public URL.
-  // We'll use Slack's public URL if available, otherwise download and
-  // serve temporarily via our own server.
+  // We proxy via our server so Twilio can fetch with proper content-type.
+  // Include filename in the URL so Twilio can determine the media type.
   if (fileInfo.url_private_download) {
-    // Return our proxy endpoint so Twilio can fetch it with auth
     const baseUrl = process.env.BASE_URL;
-    return `${baseUrl}/media/slack/${fileInfo.id}`;
+    const filename = fileInfo.name || `file.${fileInfo.filetype || "bin"}`;
+    return `${baseUrl}/media/slack/${fileInfo.id}/${encodeURIComponent(filename)}`;
   }
   return null;
 }
@@ -251,7 +251,10 @@ async function handleMediaProxy(req, res) {
     }
 
     // Stream to the requester (Twilio)
-    res.set("Content-Type", file.mimetype || "application/octet-stream");
+    const contentType = file.mimetype || "application/octet-stream";
+    const filename = file.name || `file.${file.filetype || "bin"}`;
+    res.set("Content-Type", contentType);
+    res.set("Content-Disposition", `inline; filename="${filename}"`);
     const buffer = Buffer.from(await response.arrayBuffer());
     res.send(buffer);
   } catch (err) {

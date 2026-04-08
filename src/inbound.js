@@ -12,8 +12,8 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER; // e.g. "whatsapp:+14405863762"
 
 // Business hours: Mon-Fri 08:00-18:00 Europe/Zurich, excluding ZH public holidays
-const BUSINESS_START = 8;
-const BUSINESS_END = 18;
+const BUSINESS_START = 9;
+const BUSINESS_END = 17;
 const hd = new Holidays("CH", "ZH", { languages: "en" });
 
 function getHolidayName(date) {
@@ -65,6 +65,21 @@ function getEstimatedResponseMessage() {
   }
 
   const hoursUntil = Math.round((next - zurich) / (1000 * 60 * 60));
+
+  // Format the next business day for display (e.g. "Monday at 9:00")
+  const dayName = next.toLocaleDateString("en-US", { weekday: "long", timeZone: "Europe/Zurich" });
+  const timeStr = `${BUSINESS_START}:00`;
+
+  if (hoursUntil > 24) {
+    // WhatsApp 24h window will expire — ask them to message again
+    let message = `✅ Your message reached FALU support. Our team is based in Switzerland and is currently offline until ${dayName} at ${timeStr} (Zurich time).`;
+    if (holidaysInPath.length > 0) {
+      const names = holidaysInPath.join(", ");
+      message += ` (Public holiday${holidaysInPath.length > 1 ? "s" : ""}: ${names}.)`;
+    }
+    message += `\n\n⚠️ Due to the long wait, we won't be able to read this message. Please send us a new message on ${dayName} and we'll help you right away.`;
+    return message;
+  }
 
   let message = `✅ Your message reached FALU support. Our team is based in Switzerland and is currently offline. We will reply in about ${hoursUntil} hours.`;
 
